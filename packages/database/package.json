@@ -14,7 +14,7 @@
     "@prisma/client": "^6.12.0"
   },
   "prisma": {
-    "seed": "ts-node prisma/seed.ts"
+    "seed": "node prisma/seed.js"
   },
   "scripts": {
     "db:generate": "prisma generate",
