@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>廚房收單</title>
+    <link rel="stylesheet" href="/kds/styles.css" />
+  </head>
+  <body>
+    <main class="kds-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">KITCHEN DISPLAY</p>
+          <h1>廚房訂單</h1>
+        </div>
+        <div class="live"><span></span>每 3 秒更新</div>
+      </header>
+      <section id="orders" class="orders" aria-live="polite"></section>
+    </main>
+    <div id="toast" class="toast" role="status"></div>
+    <script src="/kds/app.js"></script>
+  </body>
+</html>

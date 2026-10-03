@@ -2,6 +2,15 @@
     "name": "pos-system-core",
     "version": "1.0.0",
     "private": true,
+    "scripts": {
+        "build:types": "npm run build -w @pos/types",
+        "build:domain": "npm run build -w @pos/domain",
+        "db:generate": "npm run db:generate -w @pos/database",
+        "db:validate": "npm run db:validate -w @pos/database",
+        "db:migrate": "npm run db:migrate -w @pos/database",
+        "db:seed": "npm run db:seed -w @pos/database",
+        "dev:api": "npm run dev -w @pos/api"
+    },
     "workspaces": [
         "packages/*",
         "apps/*"

@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>桌邊點餐</title>
+    <link rel="stylesheet" href="/customer/styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="hero">
+        <p class="eyebrow">TABLE ORDER</p>
+        <h1>今天想吃什麼？</h1>
+        <p id="table-label" class="muted">讀取桌位中...</p>
+      </header>
+
+      <section id="menu" class="menu" aria-live="polite"></section>
+
+      <section id="cart-panel" class="cart-panel hidden">
+        <div class="section-heading">
+          <h2>你的訂單</h2>
+          <span id="cart-count" class="pill">0</span>
+        </div>
+        <div id="cart-items"></div>
+        <div class="cart-total"><span>合計</span><strong id="cart-total">$0</strong></div>
+        <button id="submit-order" class="primary-button">送出現金訂單</button>
+      </section>
+
+      <section id="order-panel" class="order-panel hidden" aria-live="polite">
+        <div class="section-heading"><h2>訂單狀態</h2></div>
+        <p id="order-id" class="muted"></p>
+        <div id="order-status" class="status-card"></div>
+        <div id="order-summary"></div>
+      </section>
+    </main>
+    <div id="toast" class="toast" role="status"></div>
+    <script src="/customer/app.js"></script>
+  </body>
+</html>

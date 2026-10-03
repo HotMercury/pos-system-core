@@ -3,5 +3,6 @@ export interface ProductDTO {
   name: string;
   price: number;
   category: string;
+  imageUrl?: string;
   isAvailable: boolean;
 }

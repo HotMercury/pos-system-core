@@ -5,6 +5,8 @@ export type OrderStatus =
   | "COMPLETED"
   | "CANCELLED";
 
+export type PaymentStatus = "UNPAID" | "PAID";
+
 export interface OrderItemDTO {
   id: string;
   productId: string;
@@ -17,8 +19,10 @@ export interface OrderItemDTO {
 export interface OrderDTO {
   id: string;
   tableId: string;
+  tableNumber: string;
   totalAmount: number;
   status: OrderStatus;
+  paymentStatus: PaymentStatus;
   paymentMethod?: string;
   ecpayTradeNo?: string;
   items: OrderItemDTO[];
@@ -33,6 +37,6 @@ export interface CreateOrderItemInput {
 }
 
 export interface CreateOrderInput {
-  tableId: string;
+  tableNumber: string;
   items: CreateOrderItemInput[];
 }

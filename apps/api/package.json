@@ -1,5 +1,14 @@
 {
   "name": "@pos/api",
   "version": "1.0.0",
-  "private": true
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "dev": "node --watch src/server.js",
+    "start": "node src/server.js"
+  },
+  "dependencies": {
+    "@pos/database": "1.0.0",
+    "@pos/domain": "1.0.0"
+  }
 }

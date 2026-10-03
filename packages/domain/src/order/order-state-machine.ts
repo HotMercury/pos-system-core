@@ -8,7 +8,7 @@ export type OrderStatus =
   | "CANCELLED";
 
 const ALLOWED_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
-  CREATED: ["PAID", "CANCELLED"],
+  CREATED: ["PAID", "PREPARING", "CANCELLED"],
   PAID: ["PREPARING", "CANCELLED"],
   PREPARING: ["COMPLETED", "CANCELLED"],
   COMPLETED: [],
