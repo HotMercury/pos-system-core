@@ -40,8 +40,12 @@ function serveStatic(response, root, requestPath, prefix) {
     ".css": "text/css; charset=utf-8",
     ".html": "text/html; charset=utf-8",
     ".js": "text/javascript; charset=utf-8",
+    ".jpg": "image/jpeg",
     ".json": "application/json; charset=utf-8",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
     ".svg": "image/svg+xml",
+    ".webp": "image/webp",
   };
   const contentType = contentTypes[path.extname(filePath)] || "application/octet-stream";
   response.writeHead(200, { "Content-Type": contentType });
