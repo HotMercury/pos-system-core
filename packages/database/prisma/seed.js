@@ -200,7 +200,7 @@ async function main() {
   }
 
   await prisma.product.updateMany({
-    where: { name: "牛肉麵" },
+    where: { name: { in: ["牛肉麵", "滷肉飯", "珍珠奶茶"] } },
     data: { isAvailable: false },
   });
 
