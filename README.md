@@ -56,5 +56,9 @@ GitHub; it does not need to host the live database or API.
    http://<mac-mini-ip>:3000/kds/
    ```
 
+Customer app background images can be placed at
+`apps/customer-web/public/images/app-background.webp`. The customer page loads
+that file as its global background and keeps a light overlay for readability.
+
 Do not expose PostgreSQL to the internet. Only the API port should be exposed
 through the local network or a later Cloudflare Tunnel.
