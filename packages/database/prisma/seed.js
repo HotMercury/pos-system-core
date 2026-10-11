@@ -199,6 +199,11 @@ async function main() {
     }
   }
 
+  await prisma.product.updateMany({
+    where: { name: "牛肉麵" },
+    data: { isAvailable: false },
+  });
+
   console.log("Seed data inserted.");
 }
 
