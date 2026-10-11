@@ -20,6 +20,16 @@ enum PaymentStatus {
   PAID
 }
 
+enum ProductSize {
+  M
+  L
+}
+
+enum ProductTemperature {
+  H
+  I
+}
+
 model Table {
   id        String   @id @default(uuid())
   number    String   @unique
@@ -28,13 +38,32 @@ model Table {
 }
 
 model Product {
-  id          String      @id @default(uuid())
-  name        String
+  id            String           @id @default(uuid())
+  name          String
+  englishName   String?
+  description   String?
+  price         Int              @default(0)
+  category      String
+  categoryOrder Int              @default(0)
+  displayOrder  Int              @default(0)
+  imageUrl      String?
+  isAvailable   Boolean          @default(true)
+  variants      ProductVariant[]
+  orderItems    OrderItem[]
+}
+
+model ProductVariant {
+  id          String             @id @default(uuid())
+  productId   String
+  product     Product            @relation(fields: [productId], references: [id])
+  size        ProductSize
+  temperature ProductTemperature
+  flavor      String             @default("")
   price       Int
-  category    String
-  imageUrl    String?
-  isAvailable Boolean     @default(true)
+  isAvailable Boolean            @default(true)
   orderItems  OrderItem[]
+
+  @@unique([productId, size, temperature, flavor])
 }
 
 model Order {
@@ -57,6 +86,11 @@ model OrderItem {
   order      Order    @relation(fields: [orderId], references: [id])
   productId  String
   product    Product  @relation(fields: [productId], references: [id])
+  variantId  String?
+  variant    ProductVariant? @relation(fields: [variantId], references: [id])
+  variantSize String?
+  variantTemperature String?
+  variantFlavor String?
   quantity   Int
   price      Int
   options    String?

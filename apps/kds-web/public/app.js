@@ -38,7 +38,7 @@ function renderOrders(orders) {
           <span class="status">${statusText(order.status)}</span>
         </header>
         <div class="order-lines">
-          ${order.items.map((item) => `<div class="line"><span>${item.productName} × ${item.quantity}</span><strong>${money(item.price * item.quantity)}</strong></div>`).join("")}
+          ${order.items.map((item) => `<div class="line"><span>${item.productName}${item.options ? ` <small>${item.options}</small>` : ""} × ${item.quantity}</span><strong>${money(item.price * item.quantity)}</strong></div>`).join("")}
         </div>
         <footer class="order-footer">
           <strong>合計 ${money(order.totalAmount)}</strong>

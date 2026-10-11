@@ -11,6 +11,10 @@ export interface OrderItemDTO {
   id: string;
   productId: string;
   productName: string;
+  variantId?: string;
+  variantSize?: "M" | "L";
+  variantTemperature?: "H" | "I";
+  variantFlavor?: string;
   quantity: number;
   price: number;
   options?: string;
@@ -31,7 +35,7 @@ export interface OrderDTO {
 }
 
 export interface CreateOrderItemInput {
-  productId: string;
+  variantId: string;
   quantity: number;
   options?: string;
 }

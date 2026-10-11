@@ -72,10 +72,29 @@ function productDto(product) {
   return {
     id: product.id,
     name: product.name,
+    englishName: product.englishName || undefined,
+    description: product.description || undefined,
     price: product.price,
     category: product.category,
     imageUrl: product.imageUrl || undefined,
     isAvailable: product.isAvailable,
+    variants: product.variants
+      .filter((variant) => variant.isAvailable)
+      .sort((left, right) => {
+        const sizeOrder = { M: 0, L: 1 };
+        const temperatureOrder = { H: 0, I: 1 };
+        return sizeOrder[left.size] - sizeOrder[right.size]
+          || temperatureOrder[left.temperature] - temperatureOrder[right.temperature]
+          || left.flavor.localeCompare(right.flavor, "zh-Hant");
+      })
+      .map((variant) => ({
+        id: variant.id,
+        size: variant.size,
+        temperature: variant.temperature,
+        flavor: variant.flavor || undefined,
+        price: variant.price,
+        isAvailable: variant.isAvailable,
+      })),
   };
 }
 
@@ -92,6 +111,10 @@ function orderDto(order) {
       id: item.id,
       productId: item.productId,
       productName: item.product.name,
+      variantId: item.variantId || undefined,
+      variantSize: item.variantSize || undefined,
+      variantTemperature: item.variantTemperature || undefined,
+      variantFlavor: item.variantFlavor || undefined,
       quantity: item.quantity,
       price: item.price,
       options: item.options || undefined,
@@ -103,7 +126,7 @@ function orderDto(order) {
 
 const orderInclude = {
   table: true,
-  items: { include: { product: true } },
+  items: { include: { product: true, variant: true } },
 };
 
 async function createOrder(body) {
@@ -117,15 +140,15 @@ async function createOrder(body) {
 
   const quantities = new Map();
   for (const item of body.items) {
-    if (typeof item?.productId !== "string" || !Number.isInteger(item.quantity)) {
-      throw new Error("Each item requires a productId and integer quantity");
+    if (typeof item?.variantId !== "string" || !Number.isInteger(item.quantity)) {
+      throw new Error("Each item requires a variantId and integer quantity");
     }
     if (item.quantity < 1 || item.quantity > 99) {
       throw new Error("Quantity must be between 1 and 99");
     }
     quantities.set(
-      item.productId,
-      (quantities.get(item.productId) || 0) + item.quantity
+      item.variantId,
+      (quantities.get(item.variantId) || 0) + item.quantity
     );
   }
 
@@ -135,17 +158,29 @@ async function createOrder(body) {
     });
     if (!table) throw new Error("Table not found");
 
-    const products = await transaction.product.findMany({
+    const variants = await transaction.productVariant.findMany({
       where: { id: { in: [...quantities.keys()] } },
+      include: { product: true },
     });
-    const productsById = new Map(products.map((product) => [product.id, product]));
+    const variantsById = new Map(variants.map((variant) => [variant.id, variant]));
 
-    const lines = [...quantities.entries()].map(([productId, quantity]) => {
-      const product = productsById.get(productId);
-      if (!product || !product.isAvailable) {
+    const lines = [...quantities.entries()].map(([variantId, quantity]) => {
+      const variant = variantsById.get(variantId);
+      if (!variant || !variant.isAvailable || !variant.product.isAvailable) {
         throw new Error("One or more products are unavailable");
       }
-      return { productId, quantity, price: product.price };
+      return {
+        productId: variant.productId,
+        variantId: variant.id,
+        variantSize: variant.size,
+        variantTemperature: variant.temperature,
+        variantFlavor: variant.flavor || null,
+        options: [variant.temperature, variant.size, variant.flavor]
+          .filter(Boolean)
+          .join(" / "),
+        quantity,
+        price: variant.price,
+      };
     });
 
     const totalAmount = lines.reduce(
@@ -239,7 +274,8 @@ const server = http.createServer(async (request, response) => {
     if (request.method === "GET" && path === "/api/products") {
       const products = await prisma.product.findMany({
         where: { isAvailable: true },
-        orderBy: [{ category: "asc" }, { name: "asc" }],
+        orderBy: [{ categoryOrder: "asc" }, { displayOrder: "asc" }],
+        include: { variants: true },
       });
       sendJson(response, 200, products.map(productDto));
       return;
