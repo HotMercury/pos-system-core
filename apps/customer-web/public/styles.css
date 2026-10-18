@@ -28,10 +28,20 @@ h3 { margin-bottom: 7px; font-size: 18px; }
 .english-name { margin: -4px 0 8px; color: #857b73; font-size: 13px; font-style: italic; }
 .description { min-height: 38px; margin: 0 0 13px; color: #857b73; font-size: 13px; line-height: 1.45; }
 .product-info strong { color: #806d61; }
-.variant-grid { display: grid; gap: 7px; margin-top: 12px; }
+.variant-summary { margin: 12px 0; color: #806d61; font-size: 13px; }
+.choose-button { width: 100%; border: 1px solid #806d61; border-radius: 10px; padding: 10px; color: #806d61; background: transparent; font-weight: 750; }
+.choose-button:hover { color: #fffaf1; background: #806d61; }
 .variant-button { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; border: 1px solid #d6cbc1; border-radius: 10px; padding: 9px 10px; color: #403a35; background: #fffdfa; text-align: left; font-size: 12px; }
 .variant-button:hover { border-color: #8b796d; background: #f5eee7; }
 .variant-button strong { color: #806d61; }
+.modal { position: fixed; inset: 0; z-index: 10; display: grid; align-items: end; }
+.modal.hidden { display: none; }
+.modal-backdrop { position: absolute; inset: 0; background: rgba(48, 40, 34, .42); }
+.modal-card { position: relative; width: min(560px, 100%); max-height: min(80vh, 680px); margin: 0 auto; overflow-y: auto; padding: 24px 18px 28px; border-radius: 24px 24px 0 0; background: #fbf8f3; box-shadow: 0 -16px 40px rgba(48, 40, 34, .18); }
+.modal-close { position: absolute; top: 13px; right: 14px; width: 34px; height: 34px; border: 0; border-radius: 50%; color: #806d61; background: #eee6de; font-size: 24px; line-height: 1; }
+.modal-card h2 { margin: 0 38px 7px 0; color: #403a35; }
+.modal-options { display: grid; gap: 9px; margin-top: 20px; }
+.modal-option { min-height: 48px; padding: 12px; font-size: 14px; }
 .pill { min-width: 28px; padding: 4px 9px; border-radius: 999px; color: #fff; background: #806d61; text-align: center; font-size: 13px; }
 .cart-panel, .order-panel { margin-top: 22px; padding: 18px; }
 .cart-row, .summary-row, .summary-total { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 0; border-bottom: 1px solid #ebe3db; }

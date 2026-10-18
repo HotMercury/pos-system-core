@@ -11,6 +11,10 @@ const cartTotal = document.querySelector("#cart-total");
 const orderPanel = document.querySelector("#order-panel");
 const orderStatus = document.querySelector("#order-status");
 const orderSummary = document.querySelector("#order-summary");
+const variantModal = document.querySelector("#variant-modal");
+const variantTitle = document.querySelector("#variant-title");
+const variantDescription = document.querySelector("#variant-description");
+const variantOptions = document.querySelector("#variant-options");
 const toast = document.querySelector("#toast");
 
 tableLabel.textContent = `桌位 ${tableNumber}`;
@@ -54,7 +58,7 @@ function renderMenu() {
       <div class="section-heading"><h2>${category}</h2><span class="muted">${products.length} 項</span></div>
       <div class="product-grid">
         ${products.map((product) => `
-          <article class="product-card">
+          <article class="product-card" data-product-id="${product.id}">
             ${product.imageUrl
               ? `<img src="${product.imageUrl}" alt="${product.name}" />`
               : `<div class="image-placeholder text-placeholder"><strong>${product.name}</strong><span>${product.englishName || "Coffee selection"}</span></div>`}
@@ -62,20 +66,38 @@ function renderMenu() {
               <h3>${product.name}</h3>
               ${product.englishName ? `<p class="english-name">${product.englishName}</p>` : ""}
               ${product.description ? `<p class="description">${product.description}</p>` : ""}
-              <div class="variant-grid">
-                ${product.variants.map((variant) => `
-                  <button class="variant-button" data-variant-id="${variant.id}">
-                    <span>${variantText(variant)}</span>
-                    <strong>${money(variant.price)}</strong>
-                  </button>
-                `).join("")}
-              </div>
+              <p class="variant-summary">${variantSummary(product.variants)}</p>
+              <button class="choose-button" data-product-id="${product.id}">選擇規格</button>
             </div>
           </article>
         `).join("")}
       </div>
     </section>
   `).join("");
+}
+
+function variantSummary(variants) {
+  const temperatures = [...new Set(variants.map((variant) => temperatureText(variant.temperature)))];
+  const sizes = [...new Set(variants.map((variant) => variant.size))];
+  return `${temperatures.join(" / ")} · ${sizes.join(" / ")}`;
+}
+
+function openVariantModal(product) {
+  variantTitle.textContent = product.name;
+  variantDescription.textContent = product.description || "請選擇尺寸與溫度";
+  variantOptions.innerHTML = product.variants.map((variant) => `
+    <button class="variant-button modal-option" data-variant-id="${variant.id}">
+      <span>${variantText(variant)}</span>
+      <strong>${money(variant.price)}</strong>
+    </button>
+  `).join("");
+  variantModal.classList.remove("hidden");
+  variantModal.setAttribute("aria-hidden", "false");
+}
+
+function closeVariantModal() {
+  variantModal.classList.add("hidden");
+  variantModal.setAttribute("aria-hidden", "true");
 }
 
 function renderCart() {
@@ -118,6 +140,13 @@ async function refreshOrder() {
 }
 
 menuElement.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-product-id]");
+  if (!button) return;
+  const product = state.products.find((item) => item.id === button.dataset.productId);
+  openVariantModal(product);
+});
+
+variantOptions.addEventListener("click", (event) => {
   const button = event.target.closest("[data-variant-id]");
   if (!button) return;
   const variantId = button.dataset.variantId;
@@ -125,8 +154,17 @@ menuElement.addEventListener("click", (event) => {
   const variant = product.variants.find((item) => item.id === variantId);
   const current = state.cart.get(variant.id);
   state.cart.set(variant.id, { product, variant, quantity: (current?.quantity || 0) + 1 });
+  closeVariantModal();
   renderCart();
   showToast(`${product.name} ${variantText(variant)} 已加入`);
+});
+
+variantModal.addEventListener("click", (event) => {
+  if (event.target.matches("[data-close-modal]")) closeVariantModal();
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") closeVariantModal();
 });
 
 cartItems.addEventListener("click", (event) => {
