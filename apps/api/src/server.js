@@ -152,13 +152,14 @@ function requireAdmin(request, response) {
   return true;
 }
 
-function orderDto(order) {
+function orderDto(order, includePublicToken = false) {
   return {
     id: order.id,
     orderType: order.orderType,
     tableId: order.tableId || undefined,
     tableNumber: order.table?.number || undefined,
     pickupCode: order.pickupCode || undefined,
+    publicToken: includePublicToken ? order.publicToken || undefined : undefined,
     promotionCode: order.promotionCode || undefined,
     subtotalAmount: order.subtotalAmount,
     discountAmount: order.discountAmount,
@@ -291,11 +292,23 @@ async function createOrder(body) {
       if (!pickupCode) throw new Error("Unable to create pickup code");
     }
 
+    let publicToken;
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const candidate = randomBytes(24).toString("hex");
+      const existing = await transaction.order.findUnique({ where: { publicToken: candidate } });
+      if (!existing) {
+        publicToken = candidate;
+        break;
+      }
+    }
+    if (!publicToken) throw new Error("Unable to create order token");
+
     const order = await transaction.order.create({
       data: {
         orderType,
         ...(table ? { tableId: table.id } : {}),
         ...(pickupCode ? { pickupCode } : {}),
+        publicToken,
         ...(promotion ? { promotionId: promotion.id, promotionCode: promotion.code } : {}),
         subtotalAmount,
         discountAmount,
@@ -306,29 +319,16 @@ async function createOrder(body) {
       include: orderInclude,
     });
 
-    return orderDto(order);
+    return orderDto(order, true);
   });
 }
 
-async function getOrder(id) {
+async function getOrderByToken(publicToken) {
   const order = await prisma.order.findUnique({
-    where: { id },
+    where: { publicToken },
     include: orderInclude,
   });
-  return order ? orderDto(order) : null;
-}
-
-async function getOrdersForTable(tableNumber) {
-  const table = await prisma.table.findUnique({ where: { number: tableNumber } });
-  if (!table) throw new Error("Table not found");
-
-  const orders = await prisma.order.findMany({
-    where: { tableId: table.id },
-    orderBy: { createdAt: "desc" },
-    take: 20,
-    include: orderInclude,
-  });
-  return orders.map(orderDto);
+  return order ? orderDto(order, true) : null;
 }
 
 async function getKitchenOrders() {
@@ -552,19 +552,9 @@ const server = http.createServer(async (request, response) => {
       return;
     }
 
-    if (request.method === "GET" && path === "/api/orders") {
-      const tableNumber = url.searchParams.get("tableNumber");
-      if (!tableNumber) {
-        sendError(response, 400, "tableNumber is required");
-        return;
-      }
-      sendJson(response, 200, await getOrdersForTable(tableNumber));
-      return;
-    }
-
-    const orderMatch = path.match(/^\/api\/orders\/([^/]+)$/);
-    if (request.method === "GET" && orderMatch) {
-      const order = await getOrder(orderMatch[1]);
+    const publicOrderMatch = path.match(/^\/api\/orders\/public\/([^/]+)$/);
+    if (request.method === "GET" && publicOrderMatch) {
+      const order = await getOrderByToken(publicOrderMatch[1]);
       if (!order) {
         sendError(response, 404, "Order not found");
         return;
@@ -574,12 +564,14 @@ const server = http.createServer(async (request, response) => {
     }
 
     if (request.method === "GET" && path === "/api/kitchen/orders") {
+      if (!requireAdmin(request, response)) return;
       sendJson(response, 200, await getKitchenOrders());
       return;
     }
 
     const statusMatch = path.match(/^\/api\/orders\/([^/]+)\/status$/);
     if (request.method === "PATCH" && statusMatch) {
+      if (!requireAdmin(request, response)) return;
       const body = await readJson(request);
       const order = await updateOrderStatus(statusMatch[1], body.status);
       sendJson(response, 200, order);
@@ -588,6 +580,7 @@ const server = http.createServer(async (request, response) => {
 
     const paymentMatch = path.match(/^\/api\/orders\/([^/]+)\/payment$/);
     if (request.method === "PATCH" && paymentMatch) {
+      if (!requireAdmin(request, response)) return;
       const order = await markOrderPaid(paymentMatch[1]);
       sendJson(response, 200, order);
       return;

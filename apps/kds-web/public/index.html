@@ -7,7 +7,16 @@
     <link rel="stylesheet" href="/kds/styles.css" />
   </head>
   <body>
-    <main class="kds-shell">
+    <section id="login-panel" class="kds-login">
+      <p class="eyebrow">ALLEY CAFE & BISTRO</p>
+      <h1>廚房登入</h1>
+      <form id="login-form">
+        <input name="pin" type="password" inputmode="numeric" placeholder="管理 PIN" required />
+        <button class="login-button" type="submit">登入 KDS</button>
+        <p id="login-error"></p>
+      </form>
+    </section>
+    <main id="kds-panel" class="kds-shell hidden">
       <header class="topbar">
         <div>
           <p class="eyebrow">KITCHEN DISPLAY</p>

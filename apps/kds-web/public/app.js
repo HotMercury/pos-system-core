@@ -1,5 +1,10 @@
+const loginPanel = document.querySelector("#login-panel");
+const kdsPanel = document.querySelector("#kds-panel");
+const loginForm = document.querySelector("#login-form");
+const loginError = document.querySelector("#login-error");
 const ordersElement = document.querySelector("#orders");
 const toast = document.querySelector("#toast");
+let token = sessionStorage.getItem("pos-admin-token") || "";
 
 function money(value) {
   return `$${value.toLocaleString("zh-TW")}`;
@@ -19,6 +24,27 @@ function showToast(message) {
   window.setTimeout(() => toast.classList.remove("visible"), 2200);
 }
 
+function setLoggedIn(loggedIn) {
+  loginPanel.classList.toggle("hidden", loggedIn);
+  kdsPanel.classList.toggle("hidden", !loggedIn);
+}
+
+async function apiFetch(path, options = {}) {
+  const response = await fetch(path, {
+    ...options,
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}`, ...(options.headers || {}) },
+  });
+  if (response.status === 401) {
+    token = "";
+    sessionStorage.removeItem("pos-admin-token");
+    setLoggedIn(false);
+    throw new Error("登入已失效");
+  }
+  const body = await response.json();
+  if (!response.ok) throw new Error(body.error || "操作失敗");
+  return body;
+}
+
 function renderOrders(orders) {
   if (orders.length === 0) {
     ordersElement.innerHTML = `<div class="empty-state">目前沒有訂單</div>`;
@@ -36,7 +62,7 @@ function renderOrders(orders) {
       : `<span class="paid">已收現金</span>`;
 
     return `
-      <article class="order-card ${order.status.toLowerCase()}">
+      <article class="order-card ${order.status.toLowerCase()} ${order.orderType.toLowerCase()}">
         <header class="order-header">
           <div><span class="table-number">${orderLabel(order)}</span><span class="order-time">${new Date(order.createdAt).toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit" })}</span></div>
           <span class="status">${statusText(order.status)}</span>
@@ -55,13 +81,31 @@ function renderOrders(orders) {
 
 async function loadOrders() {
   try {
-    const response = await fetch("/api/kitchen/orders");
-    if (!response.ok) throw new Error("無法取得訂單");
-    renderOrders(await response.json());
+    renderOrders(await apiFetch("/api/kitchen/orders"));
   } catch (error) {
-    ordersElement.innerHTML = `<div class="empty-state">${error.message}</div>`;
+    if (token) ordersElement.innerHTML = `<div class="empty-state">${error.message}</div>`;
   }
 }
+
+loginForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  loginError.textContent = "";
+  try {
+    const response = await fetch("/api/admin/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pin: new FormData(loginForm).get("pin") }),
+    });
+    const body = await response.json();
+    if (!response.ok) throw new Error(body.error || "登入失敗");
+    token = body.token;
+    sessionStorage.setItem("pos-admin-token", token);
+    setLoggedIn(true);
+    await loadOrders();
+  } catch (error) {
+    loginError.textContent = error.message;
+  }
+});
 
 ordersElement.addEventListener("click", async (event) => {
   const button = event.target.closest("button[data-id]");
@@ -69,13 +113,10 @@ ordersElement.addEventListener("click", async (event) => {
   button.disabled = true;
   try {
     const isPayment = button.dataset.action === "PAID";
-    const response = await fetch(`/api/orders/${button.dataset.id}/${isPayment ? "payment" : "status"}`, {
+    await apiFetch(`/api/orders/${button.dataset.id}/${isPayment ? "payment" : "status"}`, {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
       body: isPayment ? JSON.stringify({ paid: true }) : JSON.stringify({ status: button.dataset.action }),
     });
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.error || "更新失敗");
     showToast(isPayment ? "已記錄收款" : "訂單狀態已更新");
     await loadOrders();
   } catch (error) {
@@ -84,5 +125,11 @@ ordersElement.addEventListener("click", async (event) => {
   }
 });
 
-loadOrders();
-window.setInterval(loadOrders, 3000);
+if (token) {
+  setLoggedIn(true);
+  loadOrders();
+}
+
+window.setInterval(() => {
+  if (token) loadOrders();
+}, 3000);

@@ -46,7 +46,7 @@ function storageKey() {
   return `pos:orders:${state.orderType}:${tableNumber || "takeaway"}`;
 }
 
-function savedOrderIds() {
+function savedOrderTokens() {
   try {
     return JSON.parse(localStorage.getItem(storageKey()) || "[]");
   } catch {
@@ -54,8 +54,8 @@ function savedOrderIds() {
   }
 }
 
-function saveOrderIds() {
-  localStorage.setItem(storageKey(), JSON.stringify(state.orders.map((order) => order.id).slice(0, 20)));
+function saveOrderTokens() {
+  localStorage.setItem(storageKey(), JSON.stringify(state.orders.map((order) => order.publicToken).filter(Boolean).slice(0, 20)));
 }
 
 function updateOrderMode() {
@@ -168,20 +168,13 @@ function renderOrders() {
 }
 
 async function loadOrders() {
-  let orders = [];
-  if (state.orderType === "DINE_IN") {
-    const response = await fetch(`/api/orders?tableNumber=${encodeURIComponent(tableNumber)}`);
-    if (!response.ok) throw new Error("無法載入桌位訂單");
-    orders = await response.json();
-  } else {
-    const ids = savedOrderIds();
-    orders = (await Promise.all(ids.map(async (id) => {
-      const response = await fetch(`/api/orders/${id}`);
-      return response.ok ? response.json() : null;
-    }))).filter(Boolean);
-  }
+  const tokens = savedOrderTokens();
+  const orders = (await Promise.all(tokens.map(async (token) => {
+    const response = await fetch(`/api/orders/public/${token}`);
+    return response.ok ? response.json() : null;
+  }))).filter(Boolean);
   state.orders = orders;
-  saveOrderIds();
+  saveOrderTokens();
   renderOrders();
 }
 
@@ -274,7 +267,7 @@ document.querySelector("#submit-order").addEventListener("click", async () => {
     const result = await response.json();
     if (!response.ok) throw new Error(result.error || "送單失敗");
     state.orders = [result, ...state.orders.filter((order) => order.id !== result.id)].slice(0, 20);
-    saveOrderIds();
+    saveOrderTokens();
     state.cart.clear();
     promoCodeInput.value = "";
     renderCart();
