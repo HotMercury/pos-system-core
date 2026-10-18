@@ -16,6 +16,10 @@
           <p class="eyebrow">ALLEY CAFE & BISTRO</p>
           <h1>今天想喝什麼？</h1>
           <p id="table-label" class="muted">讀取桌位中...</p>
+          <div class="order-mode" role="group" aria-label="訂單類型">
+            <button class="mode-button" data-order-type="DINE_IN" type="button">內用</button>
+            <button class="mode-button" data-order-type="TAKEAWAY" type="button">外帶</button>
+          </div>
         </div>
       </header>
 
@@ -32,10 +36,8 @@
       </section>
 
       <section id="order-panel" class="order-panel hidden" aria-live="polite">
-        <div class="section-heading"><h2>訂單狀態</h2></div>
-        <p id="order-id" class="muted"></p>
-        <div id="order-status" class="status-card"></div>
-        <div id="order-summary"></div>
+        <div class="section-heading"><h2>我的訂單</h2><button id="new-order" class="new-order-button" type="button">再點一單</button></div>
+        <div id="order-list"></div>
       </section>
     </main>
     <div id="variant-modal" class="modal hidden" aria-hidden="true">

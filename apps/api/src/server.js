@@ -1,4 +1,5 @@
 const http = require("node:http");
+const { randomInt } = require("node:crypto");
 const fs = require("node:fs");
 const path = require("node:path");
 const { OrderStateMachine } = require("@pos/domain");
@@ -105,8 +106,10 @@ function productDto(product) {
 function orderDto(order) {
   return {
     id: order.id,
-    tableId: order.tableId,
-    tableNumber: order.table.number,
+    orderType: order.orderType,
+    tableId: order.tableId || undefined,
+    tableNumber: order.table?.number || undefined,
+    pickupCode: order.pickupCode || undefined,
     totalAmount: order.totalAmount,
     status: order.status,
     paymentStatus: order.paymentStatus,
@@ -134,8 +137,9 @@ const orderInclude = {
 };
 
 async function createOrder(body) {
-  if (typeof body.tableNumber !== "string" || !body.tableNumber.trim()) {
-    throw new Error("tableNumber is required");
+  const orderType = body.orderType === "TAKEAWAY" ? "TAKEAWAY" : "DINE_IN";
+  if (orderType === "DINE_IN" && (typeof body.tableNumber !== "string" || !body.tableNumber.trim())) {
+    throw new Error("tableNumber is required for dine-in orders");
   }
 
   if (!Array.isArray(body.items) || body.items.length === 0) {
@@ -157,10 +161,10 @@ async function createOrder(body) {
   }
 
   return prisma.$transaction(async (transaction) => {
-    const table = await transaction.table.findUnique({
-      where: { number: body.tableNumber.trim() },
-    });
-    if (!table) throw new Error("Table not found");
+    const table = orderType === "DINE_IN"
+      ? await transaction.table.findUnique({ where: { number: body.tableNumber.trim() } })
+      : null;
+    if (orderType === "DINE_IN" && !table) throw new Error("Table not found");
 
     const variants = await transaction.productVariant.findMany({
       where: { id: { in: [...quantities.keys()] } },
@@ -192,9 +196,24 @@ async function createOrder(body) {
       0
     );
 
+    let pickupCode;
+    if (orderType === "TAKEAWAY") {
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        const candidate = `T${randomInt(1000, 10000)}`;
+        const existing = await transaction.order.findUnique({ where: { pickupCode: candidate } });
+        if (!existing) {
+          pickupCode = candidate;
+          break;
+        }
+      }
+      if (!pickupCode) throw new Error("Unable to create pickup code");
+    }
+
     const order = await transaction.order.create({
       data: {
-        tableId: table.id,
+        orderType,
+        ...(table ? { tableId: table.id } : {}),
+        ...(pickupCode ? { pickupCode } : {}),
         totalAmount,
         paymentMethod: "CASH",
         items: { create: lines },
@@ -212,6 +231,19 @@ async function getOrder(id) {
     include: orderInclude,
   });
   return order ? orderDto(order) : null;
+}
+
+async function getOrdersForTable(tableNumber) {
+  const table = await prisma.table.findUnique({ where: { number: tableNumber } });
+  if (!table) throw new Error("Table not found");
+
+  const orders = await prisma.order.findMany({
+    where: { tableId: table.id },
+    orderBy: { createdAt: "desc" },
+    take: 20,
+    include: orderInclude,
+  });
+  return orders.map(orderDto);
 }
 
 async function getKitchenOrders() {
@@ -288,6 +320,16 @@ const server = http.createServer(async (request, response) => {
     if (request.method === "POST" && path === "/api/orders") {
       const order = await createOrder(await readJson(request));
       sendJson(response, 201, order);
+      return;
+    }
+
+    if (request.method === "GET" && path === "/api/orders") {
+      const tableNumber = url.searchParams.get("tableNumber");
+      if (!tableNumber) {
+        sendError(response, 400, "tableNumber is required");
+        return;
+      }
+      sendJson(response, 200, await getOrdersForTable(tableNumber));
       return;
     }
 

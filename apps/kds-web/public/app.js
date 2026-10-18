@@ -9,6 +9,10 @@ function statusText(status) {
   return { CREATED: "待接單", PREPARING: "製作中", COMPLETED: "已完成" }[status] || status;
 }
 
+function orderLabel(order) {
+  return order.orderType === "TAKEAWAY" ? `外帶 ${order.pickupCode}` : `桌 ${order.tableNumber}`;
+}
+
 function showToast(message) {
   toast.textContent = message;
   toast.classList.add("visible");
@@ -34,7 +38,7 @@ function renderOrders(orders) {
     return `
       <article class="order-card ${order.status.toLowerCase()}">
         <header class="order-header">
-          <div><span class="table-number">${order.tableNumber}</span><span class="order-time">${new Date(order.createdAt).toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit" })}</span></div>
+          <div><span class="table-number">${orderLabel(order)}</span><span class="order-time">${new Date(order.createdAt).toLocaleTimeString("zh-TW", { hour: "2-digit", minute: "2-digit" })}</span></div>
           <span class="status">${statusText(order.status)}</span>
         </header>
         <div class="order-lines">

@@ -6,6 +6,7 @@ export type OrderStatus =
   | "CANCELLED";
 
 export type PaymentStatus = "UNPAID" | "PAID";
+export type OrderType = "DINE_IN" | "TAKEAWAY";
 
 export interface OrderItemDTO {
   id: string;
@@ -22,8 +23,10 @@ export interface OrderItemDTO {
 
 export interface OrderDTO {
   id: string;
-  tableId: string;
-  tableNumber: string;
+  orderType: OrderType;
+  tableId?: string;
+  tableNumber?: string;
+  pickupCode?: string;
   totalAmount: number;
   status: OrderStatus;
   paymentStatus: PaymentStatus;
@@ -41,6 +44,7 @@ export interface CreateOrderItemInput {
 }
 
 export interface CreateOrderInput {
-  tableNumber: string;
+  orderType: OrderType;
+  tableNumber?: string;
   items: CreateOrderItemInput[];
 }

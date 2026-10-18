@@ -1,6 +1,7 @@
 const params = new URLSearchParams(window.location.search);
-const tableNumber = params.get("table") || "A1";
-const state = { products: [], cart: new Map(), order: null };
+const tableNumber = params.get("table");
+const initialOrderType = params.get("takeaway") === "1" || !tableNumber ? "TAKEAWAY" : "DINE_IN";
+const state = { products: [], cart: new Map(), orders: [], orderType: initialOrderType };
 
 const menuElement = document.querySelector("#menu");
 const tableLabel = document.querySelector("#table-label");
@@ -9,15 +10,12 @@ const cartItems = document.querySelector("#cart-items");
 const cartCount = document.querySelector("#cart-count");
 const cartTotal = document.querySelector("#cart-total");
 const orderPanel = document.querySelector("#order-panel");
-const orderStatus = document.querySelector("#order-status");
-const orderSummary = document.querySelector("#order-summary");
+const orderList = document.querySelector("#order-list");
 const variantModal = document.querySelector("#variant-modal");
 const variantTitle = document.querySelector("#variant-title");
 const variantDescription = document.querySelector("#variant-description");
 const variantOptions = document.querySelector("#variant-options");
 const toast = document.querySelector("#toast");
-
-tableLabel.textContent = `桌位 ${tableNumber}`;
 
 function money(value) {
   return `$${value.toLocaleString("zh-TW")}`;
@@ -33,10 +31,37 @@ function variantText(variant) {
     .join(" / ");
 }
 
+function statusText(status) {
+  return { CREATED: "已送出，等待廚房接單", PREPARING: "廚房製作中", COMPLETED: "餐點完成", CANCELLED: "訂單已取消" }[status] || status;
+}
+
 function showToast(message) {
   toast.textContent = message;
   toast.classList.add("visible");
   window.setTimeout(() => toast.classList.remove("visible"), 2400);
+}
+
+function storageKey() {
+  return `pos:orders:${state.orderType}:${tableNumber || "takeaway"}`;
+}
+
+function savedOrderIds() {
+  try {
+    return JSON.parse(localStorage.getItem(storageKey()) || "[]");
+  } catch {
+    return [];
+  }
+}
+
+function saveOrderIds() {
+  localStorage.setItem(storageKey(), JSON.stringify(state.orders.map((order) => order.id).slice(0, 20)));
+}
+
+function updateOrderMode() {
+  tableLabel.textContent = state.orderType === "DINE_IN" ? `桌位 ${tableNumber}` : "外帶取餐";
+  document.querySelectorAll("[data-order-type]").forEach((button) => {
+    button.classList.toggle("active", button.dataset.orderType === state.orderType);
+  });
 }
 
 async function loadProducts() {
@@ -102,7 +127,7 @@ function closeVariantModal() {
 
 function renderCart() {
   const entries = [...state.cart.values()];
-  cartPanel.classList.toggle("hidden", entries.length === 0 || state.order !== null);
+  cartPanel.classList.toggle("hidden", entries.length === 0);
   const count = entries.reduce((sum, item) => sum + item.quantity, 0);
   const total = entries.reduce((sum, item) => sum + item.variant.price * item.quantity, 0);
   cartCount.textContent = count;
@@ -119,25 +144,75 @@ function renderCart() {
   `).join("");
 }
 
-function statusText(status) {
-  return { CREATED: "已送出，等待廚房接單", PREPARING: "廚房製作中", COMPLETED: "餐點完成", CANCELLED: "訂單已取消" }[status] || status;
+function orderHeading(order) {
+  return order.orderType === "TAKEAWAY" ? `外帶取餐 ${order.pickupCode}` : `桌位 ${order.tableNumber}`;
 }
 
-function renderOrder(order) {
-  orderPanel.classList.remove("hidden");
-  orderStatus.innerHTML = `<strong>${statusText(order.status)}</strong><span>付款：${order.paymentStatus === "PAID" ? "已收現金" : "現金，待收款"}</span>`;
-  orderSummary.innerHTML = order.items.map((item) => `<div class="summary-row"><span>${item.productName} ${item.variantTemperature || ""}${item.variantSize || ""}${item.variantFlavor ? ` · ${item.variantFlavor}` : ""} × ${item.quantity}</span><strong>${money(item.price * item.quantity)}</strong></div>`).join("") + `<div class="summary-total"><span>合計</span><strong>${money(order.totalAmount)}</strong></div>`;
-  document.querySelector("#order-id").textContent = `訂單 ${order.id.slice(0, 8)}`;
+function renderOrders() {
+  orderPanel.classList.toggle("hidden", state.orders.length === 0);
+  orderList.innerHTML = state.orders.map((order) => `
+    <article class="saved-order">
+      <div class="saved-order-heading">
+        <div><strong>${orderHeading(order)}</strong><span class="muted">訂單 ${order.id.slice(0, 8)}</span></div>
+        <span class="order-status-label">${statusText(order.status)}</span>
+      </div>
+      <div class="saved-order-items">
+        ${order.items.map((item) => `<div class="summary-row"><span>${item.productName} ${item.options ? `· ${item.options}` : ""} × ${item.quantity}</span><strong>${money(item.price * item.quantity)}</strong></div>`).join("")}
+      </div>
+      <div class="summary-total"><span>合計</span><strong>${money(order.totalAmount)}</strong></div>
+      <p class="muted payment-line">付款：${order.paymentStatus === "PAID" ? "已收現金" : "現金，待收款"}</p>
+    </article>
+  `).join("");
 }
 
-async function refreshOrder() {
-  if (!state.order) return;
-  const response = await fetch(`/api/orders/${state.order.id}`);
-  if (response.ok) {
-    state.order = await response.json();
-    renderOrder(state.order);
+async function loadOrders() {
+  let orders = [];
+  if (state.orderType === "DINE_IN") {
+    const response = await fetch(`/api/orders?tableNumber=${encodeURIComponent(tableNumber)}`);
+    if (!response.ok) throw new Error("無法載入桌位訂單");
+    orders = await response.json();
+  } else {
+    const ids = savedOrderIds();
+    orders = (await Promise.all(ids.map(async (id) => {
+      const response = await fetch(`/api/orders/${id}`);
+      return response.ok ? response.json() : null;
+    }))).filter(Boolean);
+  }
+  state.orders = orders;
+  saveOrderIds();
+  renderOrders();
+}
+
+async function refreshOrders() {
+  try {
+    await loadOrders();
+  } catch {
+    // Keep the last visible order state during a temporary network failure.
   }
 }
+
+function startNewOrder() {
+  state.cart.clear();
+  renderCart();
+  window.scrollTo({ top: 0, behavior: "smooth" });
+  showToast("可以開始新的訂單");
+}
+
+document.querySelectorAll("[data-order-type]").forEach((button) => {
+  button.addEventListener("click", async () => {
+    if (state.cart.size > 0) {
+      showToast("請先完成或清空目前購物車");
+      return;
+    }
+    if (button.dataset.orderType === "DINE_IN" && !tableNumber) {
+      showToast("內用需要桌號 QR Code");
+      return;
+    }
+    state.orderType = button.dataset.orderType;
+    updateOrderMode();
+    await refreshOrders();
+  });
+});
 
 menuElement.addEventListener("click", (event) => {
   const button = event.target.closest("[data-product-id]");
@@ -177,6 +252,8 @@ cartItems.addEventListener("click", (event) => {
   renderCart();
 });
 
+document.querySelector("#new-order").addEventListener("click", startNewOrder);
+
 document.querySelector("#submit-order").addEventListener("click", async () => {
   const button = document.querySelector("#submit-order");
   button.disabled = true;
@@ -185,24 +262,31 @@ document.querySelector("#submit-order").addEventListener("click", async () => {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        tableNumber,
+        orderType: state.orderType,
+        ...(state.orderType === "DINE_IN" ? { tableNumber } : {}),
         items: [...state.cart.values()].map(({ variant, quantity }) => ({ variantId: variant.id, quantity })),
       }),
     });
     const result = await response.json();
     if (!response.ok) throw new Error(result.error || "送單失敗");
-    state.order = result;
+    state.orders = [result, ...state.orders.filter((order) => order.id !== result.id)].slice(0, 20);
+    saveOrderIds();
+    state.cart.clear();
     renderCart();
-    renderOrder(result);
-    showToast("訂單已送出");
+    renderOrders();
+    showToast(state.orderType === "TAKEAWAY" ? `訂單已送出，取餐號碼 ${result.pickupCode}` : "訂單已送出");
   } catch (error) {
     showToast(error.message);
+  } finally {
     button.disabled = false;
   }
 });
 
-loadProducts().catch((error) => {
-  menuElement.innerHTML = `<div class="empty-state">${error.message}</div>`;
-});
+updateOrderMode();
+loadProducts()
+  .then(loadOrders)
+  .catch((error) => {
+    menuElement.innerHTML = `<div class="empty-state">${error.message}</div>`;
+  });
 
-window.setInterval(refreshOrder, 5000);
+window.setInterval(refreshOrders, 5000);

@@ -30,6 +30,11 @@ enum ProductTemperature {
   I
 }
 
+enum OrderType {
+  DINE_IN
+  TAKEAWAY
+}
+
 model Table {
   id        String   @id @default(uuid())
   number    String   @unique
@@ -68,8 +73,10 @@ model ProductVariant {
 
 model Order {
   id            String      @id @default(uuid())
-  tableId       String
-  table         Table       @relation(fields: [tableId], references: [id])
+  orderType     OrderType   @default(DINE_IN)
+  tableId       String?
+  table         Table?      @relation(fields: [tableId], references: [id])
+  pickupCode    String?     @unique
   totalAmount   Int
   status        OrderStatus @default(CREATED)
   paymentStatus PaymentStatus @default(UNPAID)
