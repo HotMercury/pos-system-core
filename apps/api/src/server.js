@@ -10,6 +10,7 @@ const customerRoot = path.resolve(__dirname, "../../customer-web/public");
 const kitchenRoot = path.resolve(__dirname, "../../kds-web/public");
 const adminRoot = path.resolve(__dirname, "../../admin-web/public");
 const adminSessions = new Set();
+const legacyProductNames = ["牛肉麵", "滷肉飯", "珍珠奶茶"];
 
 const jsonHeaders = {
   "Content-Type": "application/json; charset=utf-8",
@@ -341,6 +342,7 @@ async function getKitchenOrders() {
 
 async function getAdminProducts() {
   const products = await prisma.product.findMany({
+    where: { name: { notIn: legacyProductNames } },
     orderBy: [{ categoryOrder: "asc" }, { displayOrder: "asc" }],
     include: { variants: true },
   });
@@ -536,6 +538,7 @@ const server = http.createServer(async (request, response) => {
 
     if (request.method === "GET" && path === "/api/products") {
       const products = await prisma.product.findMany({
+        where: { name: { notIn: legacyProductNames } },
         orderBy: [{ categoryOrder: "asc" }, { displayOrder: "asc" }],
         include: { variants: true },
       });

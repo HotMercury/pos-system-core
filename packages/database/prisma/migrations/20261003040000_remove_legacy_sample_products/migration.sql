@@ -13,5 +13,10 @@ DELETE FROM "Product"
 WHERE "name" IN ('牛肉麵', '滷肉飯', '珍珠奶茶')
 AND NOT EXISTS (
   SELECT 1 FROM "OrderItem"
-  WHERE "OrderItem"."productId" = "Product"."id"
+    WHERE "OrderItem"."productId" = "Product"."id"
 );
+
+-- Keep historical rows, but hide legacy products that are referenced by orders.
+UPDATE "Product"
+SET "isAvailable" = false
+WHERE "name" IN ('牛肉麵', '滷肉飯', '珍珠奶茶');
