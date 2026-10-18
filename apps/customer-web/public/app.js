@@ -1,6 +1,6 @@
 const params = new URLSearchParams(window.location.search);
 const tableNumber = params.get("table");
-const initialOrderType = params.get("takeaway") === "1" || !tableNumber ? "TAKEAWAY" : "DINE_IN";
+const initialOrderType = params.get("takeaway") === "1" || params.get("mode") === "takeaway" || !tableNumber ? "TAKEAWAY" : "DINE_IN";
 const state = { products: [], cart: new Map(), orders: [], orderType: initialOrderType };
 
 const menuElement = document.querySelector("#menu");
@@ -84,7 +84,7 @@ function renderMenu() {
       <div class="section-heading"><h2>${category}</h2><span class="muted">${products.length} 項</span></div>
       <div class="product-grid">
         ${products.map((product) => `
-          <article class="product-card" data-product-id="${product.id}">
+          <article class="product-card ${product.isAvailable ? "" : "sold-out"}" data-product-id="${product.id}">
             ${product.imageUrl
               ? `<img src="${product.imageUrl}" alt="${product.name}" />`
               : `<div class="image-placeholder text-placeholder"><strong>${product.name}</strong><span>${product.englishName || "Coffee selection"}</span></div>`}
@@ -93,7 +93,7 @@ function renderMenu() {
               ${product.englishName ? `<p class="english-name">${product.englishName}</p>` : ""}
               ${product.description ? `<p class="description">${product.description}</p>` : ""}
               <p class="variant-summary">${variantSummary(product.variants)}</p>
-              <button class="choose-button" data-product-id="${product.id}">選擇規格</button>
+              <button class="choose-button" data-product-id="${product.id}" ${product.isAvailable ? "" : "disabled"}>${product.isAvailable ? "選擇規格" : "已售罄"}</button>
             </div>
           </article>
         `).join("")}
@@ -112,8 +112,8 @@ function openVariantModal(product) {
   variantTitle.textContent = product.name;
   variantDescription.textContent = product.description || "請選擇尺寸與溫度";
   variantOptions.innerHTML = product.variants.map((variant) => `
-    <button class="variant-button modal-option" data-variant-id="${variant.id}">
-      <span>${variantText(variant)}</span>
+    <button class="variant-button modal-option ${variant.isAvailable ? "" : "unavailable"}" data-variant-id="${variant.id}" ${variant.isAvailable ? "" : "disabled"}>
+      <span>${variantText(variant)}${variant.isAvailable ? "" : " · 售罄"}</span>
       <strong>${money(variant.price)}</strong>
     </button>
   `).join("");
@@ -220,6 +220,7 @@ menuElement.addEventListener("click", (event) => {
   const button = event.target.closest("[data-product-id]");
   if (!button) return;
   const product = state.products.find((item) => item.id === button.dataset.productId);
+  if (!product || !product.isAvailable) return;
   openVariantModal(product);
 });
 

@@ -86,7 +86,6 @@ function productDto(product) {
     imageUrl: product.imageUrl || undefined,
     isAvailable: product.isAvailable,
     variants: product.variants
-      .filter((variant) => variant.isAvailable)
       .sort((left, right) => {
         const sizeOrder = { M: 0, L: 1 };
         const temperatureOrder = { H: 0, I: 1 };
@@ -537,7 +536,6 @@ const server = http.createServer(async (request, response) => {
 
     if (request.method === "GET" && path === "/api/products") {
       const products = await prisma.product.findMany({
-        where: { isAvailable: true },
         orderBy: [{ categoryOrder: "asc" }, { displayOrder: "asc" }],
         include: { variants: true },
       });

@@ -22,6 +22,7 @@ h3 { margin-bottom: 7px; font-size: 18px; }
 .product-grid { display: grid; gap: 12px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .product-card, .cart-panel, .order-panel { border: 1px solid #ded5cc; border-radius: 20px; background: rgba(255,253,249,.86); box-shadow: 0 12px 30px rgba(73, 61, 51, .08); overflow: hidden; }
 .product-card { position: relative; }
+.product-card.sold-out { opacity: .64; }
 .product-card img, .image-placeholder { width: 100%; aspect-ratio: 1.4; object-fit: cover; display: block; }
 .image-placeholder { display: grid; place-items: center; color: #f8f4ee; background: linear-gradient(135deg, #9b8b80, #6e7770); font-size: 52px; font-weight: 800; }
 .text-placeholder { align-content: center; gap: 6px; padding: 18px; text-align: center; }
@@ -34,8 +35,10 @@ h3 { margin-bottom: 7px; font-size: 18px; }
 .variant-summary { margin: 12px 0; color: #806d61; font-size: 13px; }
 .choose-button { width: 100%; border: 1px solid #806d61; border-radius: 10px; padding: 10px; color: #806d61; background: transparent; font-weight: 750; }
 .choose-button:hover { color: #fffaf1; background: #806d61; }
+.choose-button:disabled { border-color: #b9aea5; color: #857b73; background: #eee8e2; cursor: not-allowed; }
 .variant-button { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; border: 1px solid #d6cbc1; border-radius: 10px; padding: 9px 10px; color: #403a35; background: #fffdfa; text-align: left; font-size: 12px; }
 .variant-button:hover { border-color: #8b796d; background: #f5eee7; }
+.variant-button.unavailable, .variant-button:disabled { border-color: #ded5cc; color: #9b9189; background: #eee9e4; cursor: not-allowed; }
 .variant-button strong { color: #806d61; }
 .modal { position: fixed; inset: 0; z-index: 10; display: grid; align-items: end; }
 .modal.hidden { display: none; }

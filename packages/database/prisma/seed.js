@@ -199,10 +199,19 @@ async function main() {
     }
   }
 
-  await prisma.product.updateMany({
+  const legacyProducts = await prisma.product.findMany({
     where: { name: { in: ["牛肉麵", "滷肉飯", "珍珠奶茶"] } },
-    data: { isAvailable: false },
+    select: { id: true },
   });
+  for (const product of legacyProducts) {
+    const orderItemCount = await prisma.orderItem.count({ where: { productId: product.id } });
+    if (orderItemCount === 0) {
+      await prisma.productVariant.deleteMany({ where: { productId: product.id } });
+      await prisma.product.delete({ where: { id: product.id } });
+    } else {
+      await prisma.product.update({ where: { id: product.id }, data: { isAvailable: false } });
+    }
+  }
 
   console.log("Seed data inserted.");
 }

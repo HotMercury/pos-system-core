@@ -52,6 +52,10 @@ GitHub; it does not need to host the live database or API.
    ```
    http://<mac-mini-ip>:3000/customer/?table=A1
    ```
+   For a takeaway entry point, use:
+   ```
+   http://<mac-mini-ip>:3000/customer/?mode=takeaway
+   ```
 6. Open the kitchen display:
    ```
    http://<mac-mini-ip>:3000/kds/
