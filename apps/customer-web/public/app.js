@@ -9,6 +9,7 @@ const cartPanel = document.querySelector("#cart-panel");
 const cartItems = document.querySelector("#cart-items");
 const cartCount = document.querySelector("#cart-count");
 const cartTotal = document.querySelector("#cart-total");
+const promoCodeInput = document.querySelector("#promo-code");
 const orderPanel = document.querySelector("#order-panel");
 const orderList = document.querySelector("#order-list");
 const variantModal = document.querySelector("#variant-modal");
@@ -159,6 +160,7 @@ function renderOrders() {
       <div class="saved-order-items">
         ${order.items.map((item) => `<div class="summary-row"><span>${item.productName} ${item.options ? `· ${item.options}` : ""} × ${item.quantity}</span><strong>${money(item.price * item.quantity)}</strong></div>`).join("")}
       </div>
+      ${order.discountAmount > 0 ? `<div class="summary-row discount-row"><span>優惠 ${order.promotionCode || ""}</span><strong>-${money(order.discountAmount)}</strong></div>` : ""}
       <div class="summary-total"><span>合計</span><strong>${money(order.totalAmount)}</strong></div>
       <p class="muted payment-line">付款：${order.paymentStatus === "PAID" ? "已收現金" : "現金，待收款"}</p>
     </article>
@@ -264,6 +266,7 @@ document.querySelector("#submit-order").addEventListener("click", async () => {
       body: JSON.stringify({
         orderType: state.orderType,
         ...(state.orderType === "DINE_IN" ? { tableNumber } : {}),
+        ...(promoCodeInput.value.trim() ? { promoCode: promoCodeInput.value.trim() } : {}),
         items: [...state.cart.values()].map(({ variant, quantity }) => ({ variantId: variant.id, quantity })),
       }),
     });
@@ -272,6 +275,7 @@ document.querySelector("#submit-order").addEventListener("click", async () => {
     state.orders = [result, ...state.orders.filter((order) => order.id !== result.id)].slice(0, 20);
     saveOrderIds();
     state.cart.clear();
+    promoCodeInput.value = "";
     renderCart();
     renderOrders();
     showToast(state.orderType === "TAKEAWAY" ? `訂單已送出，取餐號碼 ${result.pickupCode}` : "訂單已送出");

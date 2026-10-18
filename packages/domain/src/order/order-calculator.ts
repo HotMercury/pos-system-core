@@ -20,6 +20,10 @@ export class OrderCalculator {
     ): OrderTotalResult {
         const { discountRate } = options;
 
+        if (discountRate !== undefined && (discountRate < 0 || discountRate > 100)) {
+            throw new RangeError("discountRate must be between 0 and 100");
+        }
+
         const subTotal = items.reduce(
             (sum, item) => sum + item.unitPrice * item.quantity,
             0
@@ -27,7 +31,7 @@ export class OrderCalculator {
 
         const discountAmount =
             discountRate !== undefined
-                ? Math.round(subTotal * (1 - discountRate / 10))
+                ? Math.round(subTotal * (discountRate / 100))
                 : 0;
         const total = subTotal - discountAmount;
 

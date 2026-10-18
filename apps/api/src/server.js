@@ -124,6 +124,21 @@ function adminProductDto(product) {
   };
 }
 
+function adminPromotionDto(promotion) {
+  return {
+    id: promotion.id,
+    code: promotion.code,
+    discountType: promotion.discountType,
+    value: promotion.value,
+    isActive: promotion.isActive,
+    startsAt: promotion.startsAt?.toISOString(),
+    endsAt: promotion.endsAt?.toISOString(),
+    minAmount: promotion.minAmount,
+    maxUses: promotion.maxUses,
+    usedCount: promotion.usedCount,
+  };
+}
+
 function adminToken(request) {
   const authorization = request.headers.authorization || "";
   return authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
@@ -144,6 +159,9 @@ function orderDto(order) {
     tableId: order.tableId || undefined,
     tableNumber: order.table?.number || undefined,
     pickupCode: order.pickupCode || undefined,
+    promotionCode: order.promotionCode || undefined,
+    subtotalAmount: order.subtotalAmount,
+    discountAmount: order.discountAmount,
     totalAmount: order.totalAmount,
     status: order.status,
     paymentStatus: order.paymentStatus,
@@ -225,10 +243,40 @@ async function createOrder(body) {
       };
     });
 
-    const totalAmount = lines.reduce(
+    const subtotalAmount = lines.reduce(
       (total, line) => total + line.price * line.quantity,
       0
     );
+
+    let promotion;
+    let discountAmount = 0;
+    const promoCode = typeof body.promoCode === "string" ? body.promoCode.trim().toUpperCase() : "";
+    if (promoCode) {
+      promotion = await transaction.promotion.findUnique({ where: { code: promoCode } });
+      const now = new Date();
+      if (!promotion || !promotion.isActive
+        || (promotion.startsAt && promotion.startsAt > now)
+        || (promotion.endsAt && promotion.endsAt < now)
+        || subtotalAmount < promotion.minAmount) {
+        throw new Error("優惠碼無效或不符合使用條件");
+      }
+      if (promotion.maxUses !== null && promotion.usedCount >= promotion.maxUses) {
+        throw new Error("優惠碼已達使用上限");
+      }
+      discountAmount = promotion.discountType === "PERCENTAGE"
+        ? Math.round(subtotalAmount * promotion.value / 100)
+        : Math.min(subtotalAmount, promotion.value);
+      const usage = await transaction.promotion.updateMany({
+        where: {
+          id: promotion.id,
+          ...(promotion.maxUses !== null ? { usedCount: { lt: promotion.maxUses } } : {}),
+        },
+        data: { usedCount: { increment: 1 } },
+      });
+      if (usage.count !== 1) throw new Error("優惠碼已達使用上限");
+    }
+
+    const totalAmount = subtotalAmount - discountAmount;
 
     let pickupCode;
     if (orderType === "TAKEAWAY") {
@@ -248,6 +296,9 @@ async function createOrder(body) {
         orderType,
         ...(table ? { tableId: table.id } : {}),
         ...(pickupCode ? { pickupCode } : {}),
+        ...(promotion ? { promotionId: promotion.id, promotionCode: promotion.code } : {}),
+        subtotalAmount,
+        discountAmount,
         totalAmount,
         paymentMethod: "CASH",
         items: { create: lines },
@@ -295,6 +346,48 @@ async function getAdminProducts() {
     include: { variants: true },
   });
   return products.map(adminProductDto);
+}
+
+async function getAdminPromotions() {
+  const promotions = await prisma.promotion.findMany({ orderBy: { createdAt: "desc" } });
+  return promotions.map(adminPromotionDto);
+}
+
+function promotionData(body) {
+  const code = typeof body.code === "string" ? body.code.trim().toUpperCase() : "";
+  const discountType = body.discountType === "FIXED" ? "FIXED" : "PERCENTAGE";
+  const value = Number(body.value);
+  if (!/^[A-Z0-9_-]{3,30}$/.test(code)) throw new Error("優惠碼只能使用 3-30 位英數字、底線或連字號");
+  if (!Number.isInteger(value) || value < 0 || (discountType === "PERCENTAGE" && value > 100)) {
+    throw new Error("優惠值不符合規則");
+  }
+
+  const minAmount = body.minAmount === undefined ? 0 : Number(body.minAmount);
+  const maxUses = body.maxUses === "" || body.maxUses === null || body.maxUses === undefined
+    ? null
+    : Number(body.maxUses);
+  if (!Number.isInteger(minAmount) || minAmount < 0 || (maxUses !== null && (!Number.isInteger(maxUses) || maxUses < 1))) {
+    throw new Error("最低消費或使用上限不符合規則");
+  }
+
+  return {
+    code,
+    discountType,
+    value,
+    minAmount,
+    maxUses,
+    isActive: body.isActive !== false,
+    startsAt: body.startsAt ? new Date(body.startsAt) : null,
+    endsAt: body.endsAt ? new Date(body.endsAt) : null,
+  };
+}
+
+async function createPromotion(body) {
+  return adminPromotionDto(await prisma.promotion.create({ data: promotionData(body) }));
+}
+
+async function updatePromotion(id, body) {
+  return adminPromotionDto(await prisma.promotion.update({ where: { id }, data: promotionData(body) }));
 }
 
 async function updateProductAvailability(id, isAvailable) {
@@ -418,6 +511,27 @@ const server = http.createServer(async (request, response) => {
     if (request.method === "PATCH" && adminVariantMatch) {
       if (!requireAdmin(request, response)) return;
       sendJson(response, 200, await updateVariant(adminVariantMatch[1], await readJson(request)));
+      return;
+    }
+
+    if (path === "/api/admin/promotions") {
+      if (!requireAdmin(request, response)) return;
+      if (request.method === "GET") {
+        sendJson(response, 200, await getAdminPromotions());
+        return;
+      }
+      if (request.method === "POST") {
+        sendJson(response, 201, await createPromotion(await readJson(request)));
+        return;
+      }
+      sendError(response, 405, "Method not allowed");
+      return;
+    }
+
+    const adminPromotionMatch = path.match(/^\/api\/admin\/promotions\/([^/]+)$/);
+    if (request.method === "PATCH" && adminPromotionMatch) {
+      if (!requireAdmin(request, response)) return;
+      sendJson(response, 200, await updatePromotion(adminPromotionMatch[1], await readJson(request)));
       return;
     }
 

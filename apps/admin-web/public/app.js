@@ -4,6 +4,8 @@ const adminView = document.querySelector("#admin-view");
 const loginForm = document.querySelector("#login-form");
 const loginError = document.querySelector("#login-error");
 const productsElement = document.querySelector("#products");
+const promotionsElement = document.querySelector("#promotions");
+const promotionForm = document.querySelector("#promotion-form");
 const feedback = document.querySelector("#feedback");
 
 function showFeedback(message, isError = false) {
@@ -67,9 +69,28 @@ function renderProducts() {
   `).join("");
 }
 
+function renderPromotions(promotions) {
+  promotionsElement.innerHTML = promotions.length === 0
+    ? `<p class="muted">目前沒有優惠碼</p>`
+    : promotions.map((promotion) => `
+      <div class="promotion-row ${promotion.isActive ? "" : "inactive"}">
+        <div><strong>${promotion.code}</strong><span class="muted">${promotion.discountType === "PERCENTAGE" ? `${promotion.value}% 折扣` : `折 $${promotion.value}`} · 已用 ${promotion.usedCount}${promotion.maxUses ? ` / ${promotion.maxUses}` : ""}</span></div>
+        <div class="promotion-actions">
+          <input type="number" min="0" value="${promotion.value}" data-promotion-value="${promotion.id}" />
+          <button class="save-price" data-save-promotion="${promotion.id}">更新</button>
+          <button class="variant-button ${promotion.isActive ? "on" : "off"}" data-toggle-promotion="${promotion.id}">${promotion.isActive ? "啟用中" : "已停用"}</button>
+        </div>
+      </div>
+    `).join("");
+}
+
 async function loadProducts() {
   state.products = await adminFetch("/api/admin/products");
   renderProducts();
+}
+
+async function loadPromotions() {
+  renderPromotions(await adminFetch("/api/admin/promotions"));
 }
 
 loginForm.addEventListener("submit", async (event) => {
@@ -86,7 +107,7 @@ loginForm.addEventListener("submit", async (event) => {
     state.token = body.token;
     sessionStorage.setItem("pos-admin-token", state.token);
     setLoggedIn(true);
-    await loadProducts();
+    await Promise.all([loadProducts(), loadPromotions()]);
   } catch (error) {
     loginError.textContent = error.message;
   }
@@ -123,7 +144,58 @@ productsElement.addEventListener("click", async (event) => {
       });
       await loadProducts();
       showFeedback("價格已更新");
+      return;
     }
+  } catch (error) {
+    showFeedback(error.message, true);
+  }
+});
+
+promotionsElement.addEventListener("click", async (event) => {
+  const savePromotion = event.target.closest("[data-save-promotion]");
+  const togglePromotion = event.target.closest("[data-toggle-promotion]");
+  if (!savePromotion && !togglePromotion) return;
+  try {
+    const id = (savePromotion || togglePromotion).dataset.savePromotion || (savePromotion || togglePromotion).dataset.togglePromotion;
+    const promotion = (await adminFetch("/api/admin/promotions")).find((item) => item.id === id);
+    const valueInput = document.querySelector(`[data-promotion-value="${id}"]`);
+    await adminFetch(`/api/admin/promotions/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        code: promotion.code,
+        discountType: promotion.discountType,
+        value: savePromotion ? Number(valueInput.value) : promotion.value,
+        minAmount: promotion.minAmount,
+        maxUses: promotion.maxUses,
+        isActive: togglePromotion ? !promotion.isActive : promotion.isActive,
+        startsAt: promotion.startsAt,
+        endsAt: promotion.endsAt,
+      }),
+    });
+    await loadPromotions();
+    showFeedback("優惠碼已更新");
+  } catch (error) {
+    showFeedback(error.message, true);
+  }
+});
+
+promotionForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  try {
+    const form = new FormData(promotionForm);
+    await adminFetch("/api/admin/promotions", {
+      method: "POST",
+      body: JSON.stringify({
+        code: form.get("code"),
+        discountType: form.get("discountType"),
+        value: Number(form.get("value")),
+        minAmount: form.get("minAmount") || 0,
+        maxUses: form.get("maxUses") || null,
+      }),
+    });
+    promotionForm.reset();
+    await loadPromotions();
+    showFeedback("優惠碼已新增");
   } catch (error) {
     showFeedback(error.message, true);
   }
@@ -137,5 +209,5 @@ document.querySelector("#logout").addEventListener("click", () => {
 
 if (state.token) {
   setLoggedIn(true);
-  loadProducts().catch((error) => showFeedback(error.message, true));
+  Promise.all([loadProducts(), loadPromotions()]).catch((error) => showFeedback(error.message, true));
 }

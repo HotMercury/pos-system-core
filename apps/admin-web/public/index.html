@@ -30,6 +30,18 @@
         </header>
         <p id="feedback" class="feedback" role="status"></p>
         <div id="products" class="products"></div>
+        <section class="promotion-section">
+          <div class="section-heading"><h2>優惠碼</h2></div>
+          <form id="promotion-form" class="promotion-form">
+            <input name="code" placeholder="例如 ALLEY10" required />
+            <select name="discountType"><option value="PERCENTAGE">折數 %</option><option value="FIXED">折抵金額</option></select>
+            <input name="value" type="number" min="0" placeholder="10" required />
+            <input name="minAmount" type="number" min="0" placeholder="最低消費" />
+            <input name="maxUses" type="number" min="1" placeholder="不限次數" />
+            <button class="primary-button" type="submit">新增優惠碼</button>
+          </form>
+          <div id="promotions" class="promotions"></div>
+        </section>
       </section>
     </main>
     <script src="/admin/app.js"></script>

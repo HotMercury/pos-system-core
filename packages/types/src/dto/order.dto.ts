@@ -27,6 +27,9 @@ export interface OrderDTO {
   tableId?: string;
   tableNumber?: string;
   pickupCode?: string;
+  promotionCode?: string;
+  subtotalAmount: number;
+  discountAmount: number;
   totalAmount: number;
   status: OrderStatus;
   paymentStatus: PaymentStatus;
@@ -46,5 +49,6 @@ export interface CreateOrderItemInput {
 export interface CreateOrderInput {
   orderType: OrderType;
   tableNumber?: string;
+  promoCode?: string;
   items: CreateOrderItemInput[];
 }

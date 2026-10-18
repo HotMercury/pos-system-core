@@ -35,6 +35,11 @@ enum OrderType {
   TAKEAWAY
 }
 
+enum PromotionDiscountType {
+  PERCENTAGE
+  FIXED
+}
+
 model Table {
   id        String   @id @default(uuid())
   number    String   @unique
@@ -77,6 +82,11 @@ model Order {
   tableId       String?
   table         Table?      @relation(fields: [tableId], references: [id])
   pickupCode    String?     @unique
+  promotionId   String?
+  promotion     Promotion?  @relation(fields: [promotionId], references: [id])
+  promotionCode String?
+  subtotalAmount Int
+  discountAmount Int          @default(0)
   totalAmount   Int
   status        OrderStatus @default(CREATED)
   paymentStatus PaymentStatus @default(UNPAID)
@@ -85,6 +95,22 @@ model Order {
   items         OrderItem[]
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
+}
+
+model Promotion {
+  id             String                 @id @default(uuid())
+  code           String                 @unique
+  discountType   PromotionDiscountType
+  value          Int
+  isActive       Boolean                @default(true)
+  startsAt       DateTime?
+  endsAt         DateTime?
+  minAmount      Int                    @default(0)
+  maxUses        Int?
+  usedCount      Int                    @default(0)
+  orders         Order[]
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
 }
 
 model OrderItem {
