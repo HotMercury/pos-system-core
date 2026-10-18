@@ -1,5 +1,5 @@
 const http = require("node:http");
-const { randomInt } = require("node:crypto");
+const { randomBytes, randomInt } = require("node:crypto");
 const fs = require("node:fs");
 const path = require("node:path");
 const { OrderStateMachine } = require("@pos/domain");
@@ -8,6 +8,8 @@ const { prisma } = require("@pos/database");
 const port = Number(process.env.PORT || 3000);
 const customerRoot = path.resolve(__dirname, "../../customer-web/public");
 const kitchenRoot = path.resolve(__dirname, "../../kds-web/public");
+const adminRoot = path.resolve(__dirname, "../../admin-web/public");
+const adminSessions = new Set();
 
 const jsonHeaders = {
   "Content-Type": "application/json; charset=utf-8",
@@ -101,6 +103,38 @@ function productDto(product) {
         isAvailable: variant.isAvailable,
       })),
   };
+}
+
+function adminProductDto(product) {
+  return {
+    id: product.id,
+    name: product.name,
+    englishName: product.englishName || undefined,
+    description: product.description || undefined,
+    category: product.category,
+    isAvailable: product.isAvailable,
+    variants: product.variants.map((variant) => ({
+      id: variant.id,
+      size: variant.size,
+      temperature: variant.temperature,
+      flavor: variant.flavor || undefined,
+      price: variant.price,
+      isAvailable: variant.isAvailable,
+    })),
+  };
+}
+
+function adminToken(request) {
+  const authorization = request.headers.authorization || "";
+  return authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
+}
+
+function requireAdmin(request, response) {
+  if (!adminSessions.has(adminToken(request))) {
+    sendError(response, 401, "Admin authentication required");
+    return false;
+  }
+  return true;
 }
 
 function orderDto(order) {
@@ -255,6 +289,37 @@ async function getKitchenOrders() {
   return orders.map(orderDto);
 }
 
+async function getAdminProducts() {
+  const products = await prisma.product.findMany({
+    orderBy: [{ categoryOrder: "asc" }, { displayOrder: "asc" }],
+    include: { variants: true },
+  });
+  return products.map(adminProductDto);
+}
+
+async function updateProductAvailability(id, isAvailable) {
+  const product = await prisma.product.update({
+    where: { id },
+    data: { isAvailable },
+    include: { variants: true },
+  });
+  return adminProductDto(product);
+}
+
+async function updateVariant(id, body) {
+  const data = {};
+  if (typeof body.isAvailable === "boolean") data.isAvailable = body.isAvailable;
+  if (body.price !== undefined) {
+    if (!Number.isInteger(body.price) || body.price < 0) {
+      throw new Error("price must be a non-negative integer");
+    }
+    data.price = body.price;
+  }
+  if (Object.keys(data).length === 0) throw new Error("No variant changes provided");
+
+  return prisma.productVariant.update({ where: { id }, data });
+}
+
 async function updateOrderStatus(id, nextStatus) {
   const order = await prisma.order.findUnique({ where: { id } });
   if (!order) throw new Error("Order not found");
@@ -305,6 +370,55 @@ const server = http.createServer(async (request, response) => {
 
     if (request.method === "GET" && path.startsWith("/kds")) {
       if (serveStatic(response, kitchenRoot, path, "/kds")) return;
+    }
+
+    if (request.method === "GET" && path.startsWith("/admin")) {
+      if (serveStatic(response, adminRoot, path, "/admin")) return;
+    }
+
+    if (request.method === "POST" && path === "/api/admin/login") {
+      const body = await readJson(request);
+      if (!process.env.ADMIN_PIN) {
+        sendError(response, 503, "ADMIN_PIN is not configured");
+        return;
+      }
+      if (String(body.pin || "") !== process.env.ADMIN_PIN) {
+        sendError(response, 401, "Invalid admin PIN");
+        return;
+      }
+      const token = randomBytes(32).toString("hex");
+      adminSessions.add(token);
+      sendJson(response, 200, { token });
+      return;
+    }
+
+    if (path === "/api/admin/products") {
+      if (!requireAdmin(request, response)) return;
+      if (request.method !== "GET") {
+        sendError(response, 405, "Method not allowed");
+        return;
+      }
+      sendJson(response, 200, await getAdminProducts());
+      return;
+    }
+
+    const adminProductMatch = path.match(/^\/api\/admin\/products\/([^/]+)$/);
+    if (request.method === "PATCH" && adminProductMatch) {
+      if (!requireAdmin(request, response)) return;
+      const body = await readJson(request);
+      if (typeof body.isAvailable !== "boolean") {
+        sendError(response, 400, "isAvailable must be a boolean");
+        return;
+      }
+      sendJson(response, 200, await updateProductAvailability(adminProductMatch[1], body.isAvailable));
+      return;
+    }
+
+    const adminVariantMatch = path.match(/^\/api\/admin\/variants\/([^/]+)$/);
+    if (request.method === "PATCH" && adminVariantMatch) {
+      if (!requireAdmin(request, response)) return;
+      sendJson(response, 200, await updateVariant(adminVariantMatch[1], await readJson(request)));
+      return;
     }
 
     if (request.method === "GET" && path === "/api/products") {

@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>小巷裡｜管理後台</title>
+    <link rel="stylesheet" href="/admin/styles.css" />
+  </head>
+  <body>
+    <main class="admin-shell">
+      <section id="login-view" class="login-card">
+        <p class="eyebrow">ALLEY CAFE & BISTRO</p>
+        <h1>店務管理</h1>
+        <p class="muted">管理商品販售狀態與規格價格</p>
+        <form id="login-form">
+          <label for="pin">管理 PIN</label>
+          <input id="pin" name="pin" type="password" inputmode="numeric" autocomplete="current-password" required />
+          <button class="primary-button" type="submit">登入</button>
+          <p id="login-error" class="error"></p>
+        </form>
+      </section>
+
+      <section id="admin-view" class="hidden">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">ALLEY CAFE & BISTRO</p>
+            <h1>商品管理</h1>
+          </div>
+          <button id="logout" class="secondary-button" type="button">登出</button>
+        </header>
+        <p id="feedback" class="feedback" role="status"></p>
+        <div id="products" class="products"></div>
+      </section>
+    </main>
+    <script src="/admin/app.js"></script>
+  </body>
+</html>

@@ -24,6 +24,7 @@ services:
     restart: unless-stopped
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:-pos_db}?schema=public
+      ADMIN_PIN: ${ADMIN_PIN:?ADMIN_PIN is required}
       PORT: 3000
     depends_on:
       postgres:

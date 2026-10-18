@@ -38,6 +38,7 @@ GitHub; it does not need to host the live database or API.
 2. Create a root `.env` file with a database password:
    ```
    POSTGRES_PASSWORD=change-this-password
+   ADMIN_PIN=change-this-admin-pin
    ```
 3. Start PostgreSQL and the API:
    ```
@@ -55,6 +56,15 @@ GitHub; it does not need to host the live database or API.
    ```
    http://<mac-mini-ip>:3000/kds/
    ```
+
+7. Open the staff admin page:
+   ```
+   http://<mac-mini-ip>:3000/admin/
+   ```
+
+The admin page uses `ADMIN_PIN` from the root `.env` to manage product and
+variant availability and prices. Changes are stored in PostgreSQL and do not
+require rebuilding or restarting the application.
 
 The customer logo is served from
 `apps/customer-web/public/images/logo.png`. Customer app background images can be placed at
