@@ -40,6 +40,11 @@ enum PromotionDiscountType {
   FIXED
 }
 
+enum CustomerSegment {
+  GENERAL
+  MEDICAL
+}
+
 model Table {
   id        String   @id @default(uuid())
   number    String   @unique
@@ -86,6 +91,7 @@ model Order {
   promotionId   String?
   promotion     Promotion?  @relation(fields: [promotionId], references: [id])
   promotionCode String?
+  customerSegment CustomerSegment @default(GENERAL)
   subtotalAmount Int
   discountAmount Int          @default(0)
   totalAmount   Int
@@ -109,6 +115,7 @@ model Promotion {
   minAmount      Int                    @default(0)
   maxUses        Int?
   usedCount      Int                    @default(0)
+  isMedical      Boolean                @default(false)
   orders         Order[]
   createdAt      DateTime               @default(now())
   updatedAt      DateTime               @updatedAt

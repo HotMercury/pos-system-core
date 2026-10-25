@@ -70,6 +70,11 @@ The admin page uses `ADMIN_PIN` from the root `.env` to manage product and
 variant availability and prices. Changes are stored in PostgreSQL and do not
 require rebuilding or restarting the application.
 
+The admin page also supports medical promotion codes and reports. Completed
+orders are counted in the daily beverage and monthly closing reports. Reports
+can be viewed in the browser and downloaded as Excel files; medical orders are
+identified by applying a promotion marked as `醫美`.
+
 The customer logo is served from
 `apps/customer-web/public/images/logo.png`. Customer app background images can be placed at
 `apps/customer-web/public/images/app-background.webp`. The customer page loads

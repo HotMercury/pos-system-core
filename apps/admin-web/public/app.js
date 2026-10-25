@@ -7,6 +7,11 @@ const productsElement = document.querySelector("#products");
 const promotionsElement = document.querySelector("#promotions");
 const promotionForm = document.querySelector("#promotion-form");
 const feedback = document.querySelector("#feedback");
+const reportDate = document.querySelector("#report-date");
+const reportMonth = document.querySelector("#report-month");
+const reportSummary = document.querySelector("#report-summary");
+const reportTable = document.querySelector("#report-table");
+let currentReport = { period: "daily", value: "" };
 
 function showFeedback(message, isError = false) {
   feedback.textContent = message;
@@ -74,7 +79,7 @@ function renderPromotions(promotions) {
     ? `<p class="muted">目前沒有優惠碼</p>`
     : promotions.map((promotion) => `
       <div class="promotion-row ${promotion.isActive ? "" : "inactive"}">
-        <div><strong>${promotion.code}</strong><span class="muted">${promotion.discountType === "PERCENTAGE" ? `${promotion.value}% 折扣` : `折 $${promotion.value}`} · 已用 ${promotion.usedCount}${promotion.maxUses ? ` / ${promotion.maxUses}` : ""}</span></div>
+        <div><strong>${promotion.code}${promotion.isMedical ? " · 醫美" : ""}</strong><span class="muted">${promotion.discountType === "PERCENTAGE" ? `${promotion.value}% 折扣` : `折 $${promotion.value}`} · 已用 ${promotion.usedCount}${promotion.maxUses ? ` / ${promotion.maxUses}` : ""}</span></div>
         <div class="promotion-actions">
           <input type="number" min="0" value="${promotion.value}" data-promotion-value="${promotion.id}" />
           <button class="save-price" data-save-promotion="${promotion.id}">更新</button>
@@ -91,6 +96,38 @@ async function loadProducts() {
 
 async function loadPromotions() {
   renderPromotions(await adminFetch("/api/admin/promotions"));
+}
+
+function renderReport(report) {
+  reportSummary.innerHTML = [
+    ["完成訂單", report.summary.orderCount],
+    ["總杯數", report.summary.cups],
+    ["一般客", report.summary.generalCups],
+    ["醫美客", report.summary.medicalCups],
+    ["實收金額", `$${report.summary.totalAmount.toLocaleString()}`],
+  ].map(([label, value]) => `<div class="report-stat"><span>${label}</span><strong>${value}</strong></div>`).join("");
+  reportTable.innerHTML = `
+    <table><thead><tr><th>客群</th><th>品項</th><th>規格</th><th>杯數</th><th>折扣前</th></tr></thead>
+    <tbody>${report.rows.map((row) => `<tr><td>${row.customerSegment === "MEDICAL" ? "醫美" : "一般"}</td><td>${row.productName}</td><td>${row.temperature}${row.size}${row.flavor ? ` / ${row.flavor}` : ""}</td><td>${row.quantity}</td><td>$${row.grossAmount.toLocaleString()}</td></tr>`).join("")}</tbody>
+    </table>`;
+}
+
+async function loadReport(period, value) {
+  currentReport = { period, value };
+  const path = period === "daily" ? `/api/admin/reports/daily?date=${value}` : `/api/admin/reports/monthly?month=${value}`;
+  renderReport(await adminFetch(path));
+}
+
+async function downloadReport() {
+  const query = currentReport.period === "daily" ? `period=daily&date=${currentReport.value}` : `period=monthly&month=${currentReport.value}`;
+  const response = await fetch(`/api/admin/reports/export?${query}`, { headers: { Authorization: `Bearer ${state.token}` } });
+  if (!response.ok) throw new Error("報表下載失敗");
+  const blob = await response.blob();
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = `${currentReport.period}-${currentReport.value}-report.xlsx`;
+  link.click();
+  URL.revokeObjectURL(link.href);
 }
 
 loginForm.addEventListener("submit", async (event) => {
@@ -163,8 +200,9 @@ promotionsElement.addEventListener("click", async (event) => {
       method: "PATCH",
       body: JSON.stringify({
         code: promotion.code,
-        discountType: promotion.discountType,
-        value: savePromotion ? Number(valueInput.value) : promotion.value,
+          discountType: promotion.discountType,
+          value: savePromotion ? Number(valueInput.value) : promotion.value,
+          isMedical: promotion.isMedical,
         minAmount: promotion.minAmount,
         maxUses: promotion.maxUses,
         isActive: togglePromotion ? !promotion.isActive : promotion.isActive,
@@ -189,6 +227,7 @@ promotionForm.addEventListener("submit", async (event) => {
         code: form.get("code"),
         discountType: form.get("discountType"),
         value: Number(form.get("value")),
+        isMedical: form.get("isMedical") === "on",
         minAmount: form.get("minAmount") || 0,
         maxUses: form.get("maxUses") || null,
       }),
@@ -196,6 +235,30 @@ promotionForm.addEventListener("submit", async (event) => {
     promotionForm.reset();
     await loadPromotions();
     showFeedback("優惠碼已新增");
+  } catch (error) {
+    showFeedback(error.message, true);
+  }
+});
+
+document.querySelector("#daily-report").addEventListener("click", async () => {
+  try {
+    await loadReport("daily", reportDate.value);
+  } catch (error) {
+    showFeedback(error.message, true);
+  }
+});
+
+document.querySelector("#monthly-report").addEventListener("click", async () => {
+  try {
+    await loadReport("monthly", reportMonth.value);
+  } catch (error) {
+    showFeedback(error.message, true);
+  }
+});
+
+document.querySelector("#download-report").addEventListener("click", async () => {
+  try {
+    await downloadReport();
   } catch (error) {
     showFeedback(error.message, true);
   }
@@ -211,3 +274,7 @@ if (state.token) {
   setLoggedIn(true);
   Promise.all([loadProducts(), loadPromotions()]).catch((error) => showFeedback(error.message, true));
 }
+
+const today = new Date();
+reportDate.value = today.toISOString().slice(0, 10);
+reportMonth.value = today.toISOString().slice(0, 7);

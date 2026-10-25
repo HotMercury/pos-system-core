@@ -38,9 +38,22 @@
             <input name="value" type="number" min="0" placeholder="10" required />
             <input name="minAmount" type="number" min="0" placeholder="最低消費" />
             <input name="maxUses" type="number" min="1" placeholder="不限次數" />
+            <label class="checkbox-label"><input name="isMedical" type="checkbox" /> 醫美</label>
             <button class="primary-button" type="submit">新增優惠碼</button>
           </form>
           <div id="promotions" class="promotions"></div>
+        </section>
+        <section class="report-section">
+          <div class="section-heading"><h2>報表與月結</h2></div>
+          <div class="report-controls">
+            <input id="report-date" type="date" />
+            <button id="daily-report" class="secondary-button" type="button">查看每日飲品</button>
+            <input id="report-month" type="month" />
+            <button id="monthly-report" class="secondary-button" type="button">查看月結</button>
+            <button id="download-report" class="primary-button" type="button">下載 Excel</button>
+          </div>
+          <div id="report-summary" class="report-summary"></div>
+          <div id="report-table" class="report-table"></div>
         </section>
       </section>
     </main>

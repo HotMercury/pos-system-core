@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@pos/database": "1.0.0",
-    "@pos/domain": "1.0.0"
+    "@pos/domain": "1.0.0",
+    "exceljs": "^4.4.0"
   }
 }

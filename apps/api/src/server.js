@@ -1,5 +1,6 @@
 const http = require("node:http");
 const { randomBytes, randomInt } = require("node:crypto");
+const ExcelJS = require("exceljs");
 const fs = require("node:fs");
 const path = require("node:path");
 const { OrderStateMachine } = require("@pos/domain");
@@ -136,6 +137,7 @@ function adminPromotionDto(promotion) {
     minAmount: promotion.minAmount,
     maxUses: promotion.maxUses,
     usedCount: promotion.usedCount,
+    isMedical: promotion.isMedical,
   };
 }
 
@@ -161,6 +163,7 @@ function orderDto(order, includePublicToken = false) {
     pickupCode: order.pickupCode || undefined,
     publicToken: includePublicToken ? order.publicToken || undefined : undefined,
     promotionCode: order.promotionCode || undefined,
+    customerSegment: order.customerSegment,
     subtotalAmount: order.subtotalAmount,
     discountAmount: order.discountAmount,
     totalAmount: order.totalAmount,
@@ -310,6 +313,7 @@ async function createOrder(body) {
         ...(pickupCode ? { pickupCode } : {}),
         publicToken,
         ...(promotion ? { promotionId: promotion.id, promotionCode: promotion.code } : {}),
+        customerSegment: promotion?.isMedical ? "MEDICAL" : "GENERAL",
         subtotalAmount,
         discountAmount,
         totalAmount,
@@ -377,6 +381,7 @@ function promotionData(body) {
     value,
     minAmount,
     maxUses,
+    isMedical: body.isMedical === true,
     isActive: body.isActive !== false,
     startsAt: body.startsAt ? new Date(body.startsAt) : null,
     endsAt: body.endsAt ? new Date(body.endsAt) : null,
@@ -389,6 +394,132 @@ async function createPromotion(body) {
 
 async function updatePromotion(id, body) {
   return adminPromotionDto(await prisma.promotion.update({ where: { id }, data: promotionData(body) }));
+}
+
+function reportRange(period, value) {
+  if (period === "daily" && /^\d{4}-\d{2}-\d{2}$/.test(value || "")) {
+    const start = new Date(`${value}T00:00:00+08:00`);
+    const end = new Date(start);
+    end.setUTCDate(end.getUTCDate() + 1);
+    return { start, end, label: value };
+  }
+  if (period === "monthly" && /^\d{4}-\d{2}$/.test(value || "")) {
+    const [year, month] = value.split("-").map(Number);
+    const start = new Date(`${value}-01T00:00:00+08:00`);
+    const end = new Date(start);
+    end.setUTCMonth(end.getUTCMonth() + 1);
+    return { start, end, label: `${year}年${month}月` };
+  }
+  throw new Error("報表日期格式不正確");
+}
+
+async function buildReport(period, value) {
+  const range = reportRange(period, value);
+  const orders = await prisma.order.findMany({
+    where: {
+      status: "COMPLETED",
+      createdAt: { gte: range.start, lt: range.end },
+    },
+    orderBy: { createdAt: "asc" },
+    include: { items: { include: { product: true, variant: true } } },
+  });
+  const rowMap = new Map();
+  let cups = 0;
+  let subtotalAmount = 0;
+  let discountAmount = 0;
+  let totalAmount = 0;
+  let generalCups = 0;
+  let medicalCups = 0;
+
+  for (const order of orders) {
+    subtotalAmount += order.subtotalAmount;
+    discountAmount += order.discountAmount;
+    totalAmount += order.totalAmount;
+    for (const item of order.items) {
+      cups += item.quantity;
+      if (order.customerSegment === "MEDICAL") medicalCups += item.quantity;
+      else generalCups += item.quantity;
+      const key = [
+        order.customerSegment,
+        item.productId,
+        item.variantTemperature,
+        item.variantSize,
+        item.variantFlavor || "",
+      ].join("|");
+      const current = rowMap.get(key) || {
+        customerSegment: order.customerSegment,
+        category: item.product.category,
+        productName: item.product.name,
+        englishName: item.product.englishName || "",
+        temperature: item.variantTemperature || "",
+        size: item.variantSize || "",
+        flavor: item.variantFlavor || "",
+        quantity: 0,
+        grossAmount: 0,
+      };
+      current.quantity += item.quantity;
+      current.grossAmount += item.price * item.quantity;
+      rowMap.set(key, current);
+    }
+  }
+
+  return {
+    period,
+    label: range.label,
+    summary: {
+      orderCount: orders.length,
+      cups,
+      generalCups,
+      medicalCups,
+      subtotalAmount,
+      discountAmount,
+      totalAmount,
+    },
+    rows: [...rowMap.values()],
+  };
+}
+
+async function reportWorkbook(report) {
+  const workbook = new ExcelJS.Workbook();
+  const summarySheet = workbook.addWorksheet("月結總表");
+  summarySheet.columns = [
+    { header: "項目", key: "name", width: 22 },
+    { header: "數值", key: "value", width: 18 },
+  ];
+  summarySheet.addRows([
+    { name: "報表期間", value: report.label },
+    { name: "完成訂單數", value: report.summary.orderCount },
+    { name: "總杯數", value: report.summary.cups },
+    { name: "一般客杯數", value: report.summary.generalCups },
+    { name: "醫美客杯數", value: report.summary.medicalCups },
+    { name: "折扣前金額", value: report.summary.subtotalAmount },
+    { name: "優惠折扣", value: report.summary.discountAmount },
+    { name: "實收金額", value: report.summary.totalAmount },
+  ]);
+
+  const drinkSheet = workbook.addWorksheet("每日飲品");
+  drinkSheet.columns = [
+    { header: "客群", key: "customerSegment", width: 12 },
+    { header: "分類", key: "category", width: 28 },
+    { header: "品項", key: "productName", width: 18 },
+    { header: "英文名", key: "englishName", width: 24 },
+    { header: "溫度", key: "temperature", width: 10 },
+    { header: "尺寸", key: "size", width: 10 },
+    { header: "風味", key: "flavor", width: 12 },
+    { header: "杯數", key: "quantity", width: 10 },
+    { header: "折扣前金額", key: "grossAmount", width: 16 },
+  ];
+  drinkSheet.addRows(report.rows.map((row) => ({
+    ...row,
+    customerSegment: row.customerSegment === "MEDICAL" ? "醫美" : "一般",
+  })));
+
+  for (const sheet of [summarySheet, drinkSheet]) {
+    sheet.getRow(1).font = { bold: true, color: { argb: "FFFFFFFF" } };
+    sheet.getRow(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF806D61" } };
+    sheet.views = [{ state: "frozen", ySplit: 1 }];
+  }
+  return workbook.xlsx.writeBuffer();
 }
 
 async function updateProductAvailability(id, isAvailable) {
@@ -533,6 +664,28 @@ const server = http.createServer(async (request, response) => {
     if (request.method === "PATCH" && adminPromotionMatch) {
       if (!requireAdmin(request, response)) return;
       sendJson(response, 200, await updatePromotion(adminPromotionMatch[1], await readJson(request)));
+      return;
+    }
+
+    const reportMatch = path.match(/^\/api\/admin\/reports\/(daily|monthly|export)$/);
+    if (request.method === "GET" && reportMatch) {
+      if (!requireAdmin(request, response)) return;
+      const reportType = reportMatch[1];
+      const period = reportType === "monthly" ? "monthly" : reportType === "daily" ? "daily" : url.searchParams.get("period");
+      const value = period === "monthly" ? url.searchParams.get("month") : url.searchParams.get("date");
+      const report = await buildReport(period, value);
+      if (reportType === "export") {
+        const buffer = await reportWorkbook(report);
+        const filename = `${period}-${value}-report.xlsx`;
+        response.writeHead(200, {
+          "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "Content-Disposition": `attachment; filename="${filename}"`,
+          "Content-Length": buffer.length,
+        });
+        response.end(buffer);
+        return;
+      }
+      sendJson(response, 200, report);
       return;
     }
 

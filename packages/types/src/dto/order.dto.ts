@@ -7,6 +7,7 @@ export type OrderStatus =
 
 export type PaymentStatus = "UNPAID" | "PAID";
 export type OrderType = "DINE_IN" | "TAKEAWAY";
+export type CustomerSegment = "GENERAL" | "MEDICAL";
 
 export interface OrderItemDTO {
   id: string;
@@ -28,6 +29,7 @@ export interface OrderDTO {
   tableNumber?: string;
   pickupCode?: string;
   promotionCode?: string;
+  customerSegment: CustomerSegment;
   subtotalAmount: number;
   discountAmount: number;
   totalAmount: number;
