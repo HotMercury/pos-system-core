@@ -83,6 +83,7 @@ function renderPromotions(promotions) {
         <div class="promotion-actions">
           <input type="number" min="0" value="${promotion.value}" data-promotion-value="${promotion.id}" />
           <button class="save-price" data-save-promotion="${promotion.id}">更新</button>
+          <button class="variant-button ${promotion.isMedical ? "on" : "off"}" data-toggle-medical="${promotion.id}">${promotion.isMedical ? "醫美" : "一般"}</button>
           <button class="variant-button ${promotion.isActive ? "on" : "off"}" data-toggle-promotion="${promotion.id}">${promotion.isActive ? "啟用中" : "已停用"}</button>
         </div>
       </div>
@@ -191,9 +192,11 @@ productsElement.addEventListener("click", async (event) => {
 promotionsElement.addEventListener("click", async (event) => {
   const savePromotion = event.target.closest("[data-save-promotion]");
   const togglePromotion = event.target.closest("[data-toggle-promotion]");
-  if (!savePromotion && !togglePromotion) return;
+  const toggleMedical = event.target.closest("[data-toggle-medical]");
+  if (!savePromotion && !togglePromotion && !toggleMedical) return;
   try {
-    const id = (savePromotion || togglePromotion).dataset.savePromotion || (savePromotion || togglePromotion).dataset.togglePromotion;
+    const action = savePromotion || togglePromotion || toggleMedical;
+    const id = action.dataset.savePromotion || action.dataset.togglePromotion || action.dataset.toggleMedical;
     const promotion = (await adminFetch("/api/admin/promotions")).find((item) => item.id === id);
     const valueInput = document.querySelector(`[data-promotion-value="${id}"]`);
     await adminFetch(`/api/admin/promotions/${id}`, {
@@ -202,7 +205,7 @@ promotionsElement.addEventListener("click", async (event) => {
         code: promotion.code,
           discountType: promotion.discountType,
           value: savePromotion ? Number(valueInput.value) : promotion.value,
-          isMedical: promotion.isMedical,
+          isMedical: toggleMedical ? !promotion.isMedical : promotion.isMedical,
         minAmount: promotion.minAmount,
         maxUses: promotion.maxUses,
         isActive: togglePromotion ? !promotion.isActive : promotion.isActive,
