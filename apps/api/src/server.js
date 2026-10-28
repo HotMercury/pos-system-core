@@ -584,8 +584,7 @@ const server = http.createServer(async (request, response) => {
     }
 
     if (request.method === "GET" && path === "/") {
-      response.writeHead(302, { Location: "/customer/" });
-      response.end();
+      serveStatic(response, customerRoot, "/home.html", "/");
       return;
     }
 

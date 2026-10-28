@@ -52,10 +52,14 @@ GitHub; it does not need to host the live database or API.
    ```
    http://<mac-mini-ip>:3000/customer/?table=A1
    ```
+    The root URL serves the Alley Cafe introduction page; `/customer/` remains the ordering app.
    For a takeaway entry point, use:
    ```
    http://<mac-mini-ip>:3000/customer/?mode=takeaway
    ```
+   For Cloudflare Tunnel, add both `alleycafe.tw` and `order.alleycafe.tw` as
+   public hostnames pointing to `http://127.0.0.1:3000`; the apex domain serves
+   the introduction page and the `order` subdomain serves the same app paths.
 6. Open the kitchen display:
    ```
    http://<mac-mini-ip>:3000/kds/
